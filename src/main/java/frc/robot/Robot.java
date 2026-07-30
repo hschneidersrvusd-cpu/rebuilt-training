@@ -7,6 +7,8 @@ package frc.robot;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
+import frc.robot.spindexer.SpindexerSubsystem;
+
 public class Robot extends TimedRobot {
     private final SpindexerSubsystem spindexer = new SpindexerSubsystem();
 
