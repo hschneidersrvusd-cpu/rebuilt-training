@@ -9,7 +9,7 @@ public class SpindexerConfig {
     public static final double currentLimit = 80.0;
 
     /** The speed that the motor runs at */
-    public static final double startMotorSpeed = 0.5; // TODO: tune motor speed
+    public static final double startMotorSpeed = 0.5; // TODO: tune the motor speed
 
     static {
         motorConfig.CurrentLimits.StatorCurrentLimit = 80.0;

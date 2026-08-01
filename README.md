@@ -5,7 +5,7 @@ Advanced training using the REBUILT 2026 robot.
 Trainees, please go to [`TRAINING.md`](TRAINING.md)
 
 ## Controls
-
+* leftBumper turns on spindexer while its held down and turns it off when it is not being held
 ### Xbox Controller Bindings
 (Add documented controls here)
 
