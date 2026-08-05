@@ -6,6 +6,8 @@ Trainees, please go to [`TRAINING.md`](TRAINING.md)
 
 ## Controls
 * leftBumper turns on spindexer while its held down and turns it off when it is not being held
+* povDown deploys intake
+* povUp stows intake
 ### Xbox Controller Bindings
 (Add documented controls here)
 
