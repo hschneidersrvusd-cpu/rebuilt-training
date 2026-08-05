@@ -10,12 +10,14 @@ import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 
 import frc.robot.intake.IntakeSubsystem;
+import frc.robot.launcher.feeder.FeederSubsystem;
 import frc.robot.spindexer.SpindexerSubsystem;
 
 public class Robot extends TimedRobot {
     private final CommandXboxController controller = new CommandXboxController(0);
     private final SpindexerSubsystem spindexer = new SpindexerSubsystem();
     private final IntakeSubsystem intake = new IntakeSubsystem();
+    private final FeederSubsystem feeder = new FeederSubsystem();
 
     public Robot() {
         initDashboard();
@@ -25,6 +27,7 @@ public class Robot extends TimedRobot {
     public void initDashboard() {
         SmartDashboard.putData("Spindexer", spindexer);
         SmartDashboard.putData("Intake", intake);
+        SmartDashboard.putData("Feeder", feeder);
     }
 
     public void initBindings() {
