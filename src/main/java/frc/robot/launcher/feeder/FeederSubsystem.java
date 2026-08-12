@@ -5,10 +5,8 @@ import com.ctre.phoenix6.hardware.TalonFX;
 import edu.wpi.first.util.sendable.SendableBuilder;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
-import frc.robot.spindexer.SpindexerConst;
-
 public class FeederSubsystem extends SubsystemBase {
-    private final TalonFX motor = new TalonFX(SpindexerConst.MOTOR_ID);
+    private final TalonFX motor = new TalonFX(FeederConst.MOTOR_ID, FeederConst.CAN_BUS);
 
     public void setMotorSpeed(double speed) {
         motor.set(speed);
