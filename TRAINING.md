@@ -62,6 +62,26 @@ WPILib is the software suite containing all necessary packages and applications 
         - [Intake Bindings](#intake-bindings)
         - [Retrieving Intake Angle](#retrieving-intake-angle)
         - [Robot Constructor Refactoring](#robot-constructor-refactoring)
+    - [Launcher Assembly](#launcher-assembly)
+        - [Control Area Network](#control-area-network)
+        - [Feeder Subsystem](#feeder-subsystem)
+            - [Feeder Requirements](#feeder-requirements)
+        - [Hood Subsystem](#hood-subsystem)
+            - [Hood Specifications](#hood-specifications)
+            - [Recording the Setpoint](#recording-the-setpoint)
+        - [Shooter Subsystem](#shooter-subsystem)
+            - [Leader and Follower Motors](#leader-and-follower-motors)
+            - [Configuring Shooter Motors](#configuring-shooter-motors)
+            - [Shooter Movement Methods](#shooter-movement-methods)
+        - [Turret Subsystem](#turret-subsystem)
+            - [Motors vs Encoders](#motors-vs-encoders)
+            - [Turret Movement Methods](#turret-movement-methods)
+        - [Automatic Targeting](#automatic-targeting)
+            - [Aiming The Turret](#aiming-the-turret)
+            - [Determining Launch Speed](#determining-launch-speed)
+            - [Putting It Together](#putting-it-together)
+
+- [Temporary End](#temporary-end)
 
 ## Attribution
 This file and codebase were written by @spacepotatoes3 and @aatle on GitHub.
@@ -988,6 +1008,561 @@ Be sure to add the intake subsystem to the dashboard in `Robot.java`!
 In `Robot.java`, notice that the robot constructor currently performs two different tasks: adding sendables to the dashboard, and initializing bindings.
 
 To better organize the code, extract out these tasks into separate methods, `initDashboard()` and `initBindings()`.
+
+### Launcher Assembly
+Now we can start on the subsystems that make up our *launcher assembly* (feeder, hood, shooter, turret).
+
+<sub><sup>Mentors, explain what each subsystem in the launcher assembly is.</sup></sub>
+
+For better organization, create a folder called `launcher` to store all of these four subsystems.
+
+#### Control Area Network
+First, a new electrical aspect of the launcher assembly needs to be discussed.
+
+Recall that every device (e.g. motor) on the robot has a unique CAN ID, aka device ID, that is used to identify it. But what is CAN?
+
+CAN stands for Control Area Network, which is the nervous system of the robot. Electrically, it is wired with yellow and green wires.
+
+This system is controlled by a central brain, which is the CAN Bus. The main or default CAN bus is actually the roboRIO itself (the main robot computer). However, additional dedicated CAN buses can be added to the robot to reduce traffic on them.
+
+In code, a `CANBus` object can be instantiated with the registered name of the CAN bus. (It is safe to make multiple instances referring to the same CAN bus.)
+```java
+new CANBus() // new default CAN bus (usually roboRIO)
+new CANBus("launcher") // new CAN bus referring to bus named launcher
+CANBus.roboRIO() // new CAN bus explicitly referring to roboRIO
+```
+
+Then, these `CANBus` objects may be passed into device constructors:
+```java
+private final TalonFX motor = new TalonFX(SubsysConst.MOTOR_ID, SubsysConst.CAN_BUS);
+```
+If no `CANBus` is provided, then the device defaults to using the default `CANBus`.
+
+If a device is put on the wrong `CANBus` in code, then it will not work. Be sure that any electrical CAN bus changes are immediately updated in the codebase.
+
+For the launcher assembly, all subsystem devices use a CAN bus with the name `launcher`, *except for the feeder subsystem*.
+
+#### Feeder Subsystem
+We'll set up the feeder subsystem first.
+
+The feeder subsystem will be nearly identical in functionality to the spindexer.
+
+First, make your `feeder` folder and the three files inside it. Populate any basic constants or configurations, adding placeholders and comments when necessary.
+
+Also create a new `CAN_BUS` constant in `FeederConst`, initialized to a `new CANBus()` (no arguments).
+
+For the `TalonFX()` motor constructor, pass `FeederConst`'s `CAN_BUS` in as the second argument. We are doing this to be explicit since the feeder is the exception in the launcher.
+
+##### Feeder Requirements
+From here, you can write the rest of `FeederSubsystem.java` on your own. It should have:
+- A motor configured with:
+  - Stator current limit (untuned)
+  - Neutral mode set to coast
+  - Motor direction with intuitive convention (untuned)
+- Method to set motor speed
+- Methods to start, stop, brake, and reverse
+- Method to get the current motor speed
+- Correctly initialized dashboard properties
+- Appropriate documentation and comments
+- Appropriate code organization according to our codebase conventions
+- Subsystem is properly initialized inside `Robot`
+
+You do not have to add bindings or a default command for the feeder yet; we will do that when all subsystems of the launcher are set up.
+
+You may reference:
+- 1st, spindexer or subsystem that you wrote earlier (do not copy-paste)
+- 2nd, other trainees (not their code), if possible
+- 3rd, mentors
+
+You may not reference AI, browser, or outside people for writing the simple feeder subsystem.
+
+Once you complete the feeder, a mentor will show you any mistakes or problems.
+
+<details><summary>Potential problems</summary>
+
+- Forgot to initialize subsystem as a field in `Robot`
+- Forgot to send feeder to `SmartDashboard` in `Robot.initDashboard()`
+- Forgot to extend from `SubsystemBase`
+- Missing or inaccurate modifiers
+- Incorrect naming convention of symbol
+- Forgot to document unit of dashboard property in the label
+- Did not add setter for dashboard property
+- Did not write any Javadoc comments
+- Did not write any TODO comments
+- Forgot to document direction convention
+- Constant or config field declared in wrong place
+- Placed files directly inside `launcher` folder instead of new `feeder` subfolder
+
+</details>
+
+#### Hood Subsystem
+Next, we'll create our hood subsystem.
+
+The hood subsystem will work similarly to the `deployMotor` in `IntakeSubsystem`.
+
+Before you start, think of what convention you want to use for the hood's position. (There are really two acceptable options.)
+
+##### Hood Specifications
+Info:
+- Hood motor is on the launcher CAN bus
+- Fuel is shot perpendicularly to where the hood points
+- Hood has one hardstop usable for stow, but has no encoder
+- The hardstop is at `16.394` degrees above the horizontal; or equivalently, the maximum fuel launch pitch is `73.606` degrees above horizontal
+- The hood gear ratio, rotor to mechanism, is `24:1`
+
+Notes:
+- The term for hood position/angle is *pitch*
+- There is no second hardstop, but the useful range of the hood for launching is obviously physically limited
+
+**Requirements:**
+- A motor properly initialized and configured
+- Method for moving hood pitch, with appropriate safety
+- Method to stow hood
+- Method to get pitch of hood
+- Appropriate dashboard properties
+- Correct conventions and documentation
+
+You do not have to add bindings or a default command for the hood yet; we will do that when all subsystems of the launcher are set up.
+
+Same rules for referencing information as the feeder.
+
+<details><summary>Additional potential problems</summary>
+
+- Did not configure `Feedback.SensorToMechanismRatio` to gear ratio
+- Did not configure software limit switches for both directions
+- Did not clamp angle parameter in method to move pitch
+- Inconsistent usage of pitch convention
+- Forgot to document pitch convention
+- Did not use Units library
+- Used a name other than `motor` (the most concise) for the motor field
+- +Potential problems listed from feeder section
+
+</details>
+
+##### Recording the Setpoint
+One thing that our code is not aware of is what the current target angle is. The target position of a mechanism is called its *setpoint*.
+
+Take a minute to think of how you could implement a field that always has the current target pitch. You would not need to make any additional method calls.
+
+The way that you can easily implement a field that has the setpoint is by updating the field inside of your hood movement method.
+
+The only time that the target pitch changes is when your movement method is called. So, by storing the given pitch in a field when the method executes, the correct setpoint is always accessible later.
+
+Define a private `Angle` field named `targetPitch`. Modify your movement method to set the field plus use the field for the request.
+
+Then use `targetPitch` to add a new dashboard property.
+
+In general, these setpoint fields should be used for any movement that uses a control request instead of `set()` or `setVoltage()` methods.
+
+Once you are done with this, go back to `IntakeSubsystem` and implement a setpoint field and dashboard property for the angle.
+
+#### Shooter Subsystem
+The shooter subsystem has two motors both connected to the same axle, to provide extra force for launching the fuel using flywheels.
+
+The CAN bus for both motors is the `launcher` one.
+
+##### Leader and Follower Motors
+Before we start on the shooter subsystem, we have to learn how leader and follower motors work.
+
+With `TalonFX`, you can designate certain motors as leaders and certain motors as followers. Leader motors are controlled directly by the program, while follower motors automatically mirror what the leader does (voltage, duty cycle, `MotionMagicVoltage`).
+
+This is much more reliable than manually setting both motors to be the exact same output and makes it easier to write subsystems where the motors move in sync, like our double motor shooter.
+
+The follower can either be set to go in the same direction or opposite direction as the leader.
+
+In our case, if the shooter motors don't apply the same output or go in the wrong directions, it may break the mechanism or motors.
+
+Use the `Follower` control request on the follower motor, immediately in the subsystem constructor, to set a leader and follower.
+
+##### Configuring Shooter Motors
+The shooter subsystem will have two `TalonFX` motor fields, `rightLeaderMotor` and `leftFollowerMotor`. Each can be initialized with their respective motor IDs and the same CAN bus from `ShooterConst.java`.
+
+Both motors will use the same motor configuration, `motorConfig`, in `ShooterConfig.java`. Make sure to set both current limits. Since they are flywheels, coast is best here.
+
+Note: The positive direction is set to whatever would be the "shooting" direction for the leader motor (in this case the right shooter motor).
+
+Create a constructor for `ShooterSubsystem` and apply this configuration to the left and right motors. Since we want them to be leader and follower, there is one additional configuration step to take. Beneath where you applied the motor configuration, add this line:
+
+```java
+leftFollowerMotor.setControl(
+new Follower(rightLeaderMotor.getDeviceID(), MotorAlignmentValue.Opposed));
+```
+
+We call the `setControl()` method on a follower motor to specify how we want it to behave. The first parameter is the ID of the leader motor it should listen to, and the second dictates if it will spin in the same or opposite direction to its follower. In order to shoot fuel properly, the left motor will have to invert  the direction of the right (`MotorAlignmentValue.Opposed`).
+
+##### Shooter Movement Methods
+To start, make a field to store the target angular velocity of the shooter subsystem at all times. The type is `AngularVelocity`.
+
+Then, we need to make a method that sets the shooter motors to any desired velocity. Create a method called `moveAngularVelocity` that updates the value of `targetAngularVelocity` and sets the right leader motor to a specific speed (the left does not need to be set, it will mirror automatically). Ensure that the magnitude of this velocity is within the shooter's limitations (`MAX_ANGULAR_VELOCITY`).
+
+Create a method `stop()` that stops the shooter motors and updates `targetVelocity` accordingly.
+
+We may want to be able to enable and disable the shooter independently of the rest of the launcher assembly, for testing purposes or streamlining commands. Underneath where you created the `targetAngularVelocity` field, add a field that can track whether the shooter subsystem is enabled or not.
+
+In your `moveAngularVelocity()` method, add a check to see if the shooter subsystem is enabled. If it is disabled, prevent the motors from moving.
+
+Next, you'll want to make a getter method for the shooter's angular velocity. While we could use `motor.get()` to retrieve the speed as a fraction between `-1.0` and `1.0`, we want a more specific value so we can better test our shooter. For this, we can use the `getVelocity()` method in place of `get()`, which returns the motor's velocity in rotations per second (rps) instead. 
+
+Remember that `getVelocity()` returns a `StatusSymbol<AngularVelocity>` value that you'll have to convert into `AngularVelocity` with `getValue()`.
+
+Your method should look like this:
+```java
+public AngularVelocity getAngularVelocity() {
+return rightLeaderMotor.getVelocity().getValue();
+}
+```
+
+Add both the shooter's angular velocity (using `getAngularVelocity()`) and the recorded `targetAngularVelocity` into an `initSendable()` method. Remember to convert the values you pass in to rps using the Units library (`.in(RotationsPerSecond)`).
+
+The retrieved angular velocity should not have a setter passed in, but the target angular velocity field should. Use a lambda expression to pass an inputted angular velocity into the `moveAngularVelocity()` method.
+
+Also add the `enabled` property to your `initSendable()`. You can do this with the `addBooleanProperty()` method. For the getter, use a lambda expression that takes in no parameters and checks the value of `enabled`. The setter should also be a lambda expression, one that takes in a parameter `enabled`, checks if it is true, and updates the value of 'enabled' accordingly.
+
+<details><summary> All properties should look like this: </summary>
+
+```java
+       builder.addDoubleProperty(
+                "angular velocity (RPS)", () -> getAngularVelocity().in(RotationsPerSecond), null);
+        builder.addDoubleProperty(
+                "target angular velocity (RPS)",
+                () -> targetAngularVelocity.in(RotationsPerSecond),
+                (double angularVelocity) -> moveAngularVelocity(RotationsPerSecond.of(angularVelocity)));
+        builder.addBooleanProperty(
+                "enabled",
+                () -> enabled,
+                (enable) -> {
+                    if (enable) enabled = true;
+                    else enabled = false;
+                });
+```
+</details>
+
+#### Turret Subsystem
+
+##### Motors vs Encoders
+The turret subsystem has both a motor and an **encoder**. Encoders are sensors we use to track motor position, separate from the motor itself.
+
+Initialize the motor and encoder to start. Encoders are initialized similar to motors, but they are of type `CANCoder` instead of `TalonFX`. Both will need placeholder motor IDs in `TurretConst` and the same `CAN_BUS` as the hood subsystem passed into their constructors.
+
+Configure the turret motor with a stator current limit of `30` and make it brake when output is neutral.
+
+You will need to make a configuration for the encoder as well (object type `CANcoderConfiguration`).
+
+In a separate `static` block, set two properties of your encoder configuration:
+`MagnetSensor.MagnetOffset` to the value `-0.444`. This represents the angular displacement between the encoder's true (mechanical) zero position and the one reported by the encoder itself.
+`MagnetSensor.SensorDirection` to an enum value of `SensorDirectionValue` (similar to the motor's `MotorOutput.Inverted` field, we will determine this in testing)
+
+Also enable and set forward/reverse limit switches for the turret motor.
+
+Be sure to set a stow yaw for our turret (upon stow/startup) as a constant.
+
+We will also need to store our *encoder to mechanism ratio* as a constant. This value is the number of encoder rotations recorded for every mechanism rotation, and will be useful for conversions. Set it to `8.5`.
+
+Because we're using an encoder, there are some additional steps we'll take when configuring the motor. `TalonFXConfiguration` objects also have a `Feedback` field where we can set and configure the motor's *feedback source*. In this case, our encoder readings are the "feedback" we give to the motor; the motor receives its exact position and can adjust accordingly.
+
+First, we'll set the motor config's `Feedback.FeedbackSensorSource` field to a value of the `FeedbackSensorSourceValue` enum, `RemoteCANcoder`.
+
+Now set the `Feedback.FeedbackRemoteSensorID` property to the encoder ID you declared earlier.
+
+Lastly, set the `Feedback.SensorToMechanismRatio` property to your encoder to mechanism ratio value.
+
+Apply both configurations in the `TurretSubsystem` constructor.
+
+Similar to the hood, the turret should also have a target field for setpoints. Create an `Angle` called `targetYaw` that will be updated when we change the turret position.
+
+The turret subsystem should also have an `enabled` field for testing purposes.
+
+##### Turret Movement Methods
+To start, write a method that returns the current turret yaw in rotations. Note that the `getPosition()` method will read the CANcoder instead of the motor, and already accounts for the encoder to mechanism ratio (no conversion needed).
+
+We will write two methods to move the turret, one that sets it to the exact inputted position and one that calculates the best possible position to move to that still faces the correct direction. Let's start with the former.
+
+Our first method will be called `moveRawYaw()`. Make sure to check that the turret is enabled before trying to change its position.
+
+In the method body, update `targetYaw` to the new setpoint. Remember to clamp the new value between the turret subsystem's `MIN_ANGLE` and `MAX_ANGLE`.
+
+After you update `targetYaw`, use a new `MotionMagicVoltage` request to move the turret motor. 
+
+Use this `moveRawYaw()` method in a new method to stow the turret.
+
+Our second movement method, which calculates the best possible turret position, will be named `moveYaw()`. 
+
+Because the turret can make more than one full rotation within its mechanical limitations, there will sometimes be two yaw values the turret could move to in order to point the same direction. These yaw values are considered **coterminal**, because they are different angles that point the same way. One of these positions will be closer for the turret to move to than the other. Now, you'll write a method that calculates the distance the turret would need to move to each point and chooses the shorter distance.
+
+To start, create two `double` values to store the turret's current yaw and the desired (input) yaw.
+
+To make our calculations easier, we are going to treat the position we want to end up (our *desired* yaw) as if it's at `0.0` rotations. In other words, we are changing our *frame of reference* and writing all other yaw values in terms of how far they are from our desired yaw. 
+
+Let's start by creating a new variable to store the turret's current yaw relative to our desired yaw, called something like `relCurrentYaw`. To do this, simply subtract the desired value from the current value.
+
+Create two more variables to store the turret's minimum and maximum angles, relative to our desired yaw.
+
+Now we can look for the best position to set the turret in order to point in the desired direction. The yaw value we're looking for will have to be:
+The closest value to our current yaw that is also **coterminal** to our desired yaw
+Within the mechanical limits (max and min angles) of the turret
+
+Let's start by finding the closest coterminal yaw value to our current yaw. Because we're considering our desired yaw to be `0.0` right now, finding the potential coterminal values are easy; they will all fall exactly one rotation away from each other, so our possible coterminal yaws are simply `0`, `1`, `2`, `-1`, `-2`, etc.
+
+This means that finding the closest coterminal angle to our (relative) current yaw is just a matter of rounding that value to the nearest integer.
+
+Now that we've found the angle we want, let's make sure it's within the turret's mechanical bounds.
+
+Determine the smallest and largest coterminal angles that the turret could move to within its minimum/maximum angles. Use the `Math.ceil()` and `Math.floor()` methods.
+
+Clamp our closest coterminal angle between these new limitations to make sure we don't break the turret.
+
+We have to convert the yaw value we found back to the turret motor's frame of reference before we move anything. Add our desired yaw value back to this angle to do so.
+
+Lastly, use your `moveRawYaw()` method to point the turret in our desired direction!
+
+We will also need a `calibrateYaw()` method that correctly calibrates the encoder position based on where we think the turret is. 
+
+We need this method because the encoder has many rotations per mechanism rotation, but it only tracks the position within one rotation on boot, so it could be off by a whole number of rotations on startup. Only the phase of the encoder is always correct.
+
+To calibrate the encoder, our method will use a "guess" of the current yaw (passed into the method) and the encoder's current position (off by whole rotations) to determine what the encoder position should be set to.
+
+The method finds the coterminal (off by whole rotations, so some phase) encoder position the closest to the guess, and then sets the encoder position to that.
+
+First, make sure our inputted guess yaw is actually within the range of valid turret yaws.
+
+Next, you'll need two `double` values; the encoder's current position and our guessed position (which should be converted into encoder rotations).
+
+To figure out how far off our encoder measurement is, we want to take the difference between its current position and our guess position. However, since our guess rotation is not exact, we want to *round* this result to the nearest rotation. This value gives us the offset between where the encoder thinks the turret is and where it actually is.
+
+Make sure to clamp this value between the possible range of offsets so we aren't setting the encoder to an invalid position!
+
+Remember to add the measured encoder position back to your clamped offset to find the coterminal encoder position closest to your guess yaw.
+
+Finally, use the `setPosition()` method to update the encoder to your new calibrated position.
+
+Another useful piece of information here would be the turret's yaw error, or the difference between the desired and current yaw. Create a method called `getYawError()` that retrieves this difference.
+
+A little bit of error is expected and okay, but error past a certain set tolerance becomes an issue.
+
+Let's start with a yaw error tolerance of `3` degrees. Save this value in your config file.
+
+In `TurretSubsystem.java`, create a method that compares the current yaw error with this value, and returns whether or not it is still within tolerance.
+
+Now we can start adding turret information to the dashboard. In a new `initSendable()` method, initialize the following properties:
+Turret status (enabled/disabled)
+Current yaw (all angles should be in degrees)
+Target yaw 
+Yaw error
+Whether or not the error is within tolerance
+
+<details><summary>Your final method should look like this:</summary>
+
+```java
+@Override
+    public void initSendable(SendableBuilder builder) {
+        builder.addBooleanProperty(
+                "enabled",
+                () -> enabled,
+                (enable) -> {
+                    if (enable) enabled = true;
+                    else enabled = false;
+                });
+        // Use this dashboard property setter to calibrate yaw if necessary after startup
+        builder.addDoubleProperty(
+                "YAW (deg)",
+                () -> getYaw().in(Degrees),
+                (guessYaw) -> calibrateYaw(Degrees.of(guessYaw)));
+        builder.addDoubleProperty(
+                "target yaw, raw (deg)",
+                () -> targetYaw.in(Degrees),
+                (yaw) -> moveRawYaw(Degrees.of(yaw)));
+        builder.addDoubleProperty("yaw error (deg)", () -> getYawError().in(Degrees), null);
+        builder.addBooleanProperty("within tolerance", this::withinTolerance, null);
+    }
+```
+</details>
+
+### Automatic Targeting
+
+#### Aiming The Turret
+
+The point of having a turret subsystem is to aim at the hub and score regardless of the robot's present rotation. While we could have the driver aim it manually, it would be a lot slower and less accurate than performing the calculations in code. We want to write a method in `turretSubsystem.java` that reads the current robot position and determines which way the turret needs to aim.
+
+This might seem like a complicated task, but we'll break down the calculations and make it easier to follow.
+
+> Note: In the original rebuilt robot's codebase, Anthony implemented a more complicated "shoot on the move" algorithm that accounted for robot velocity as well as position. These calculations are too complicated to teach in this training, so our goal will be making the robot aim accurately towards the hub at a standstill.
+
+Let's work with a simpler problem to start. Assume the robot's rotation is always 0 (facing away from the driverstation) as we drive it around the field. All we have to do is determine the angle $\theta$ (pronounced *theta*) between the turret's current direction and the direction we want it to face (towards the hub), which will be the change in yaw for the turret.
+
+Since we have both the robot and hub positions (as FCS coordinates), the calculations come down to basic trigonometry. We can draw a straight line from the robot's center to the hub's center and use this as a hypotenuse for a right triangle, where the legs are the change in x and y values respectively.
+
+The $\theta$ will be the angle we want to find, the difference between the robot's current orientation and the way it must face to aim at the hub. 
+
+Since we have the x and y coordinates of both the robot and the hub (FCS), we can solve for the side lengths of the right triangle's legs. 
+
+Now we can use a trigonometric function known as *tan*, which relates the value of an angle $\theta$ to the ratio of its opposite and adjacent sides in a right triangle. It looks like this:
+
+$$
+\tan\theta = \frac{opposite}{adjacent}
+$$
+
+Since we know the values of both the opposite and adjacent sides from the angle we want to find, we can substitute those in and solve the expression.
+
+$$
+\tan\theta = \frac{x}{y}
+$$
+
+In order to solve for $\theta$, we have to get rid of the tan somehow. For this, we can use an inverse trigonometric function, which essentially "undoes" a normal trigonometric function when applied. The inverse function of tan is known as arctan.
+
+Applying it here looks like this:
+
+$$
+\arctan(\tan\theta) = \arctan(\frac{x}{y}) \\
+\theta = \arctan(\frac{x}{y})
+$$
+
+Now we have an expression for $\theta$ with all known values, meaning we can solve for the desired turret yaw at any point.
+
+But what about when the robot's rotation isn't 0?
+
+In this case, we have to add an offset to our calculated target yaw to "cancel out" the robot's rotation. This is a much simpler calculation to make; for example, if the robot is rotated 90 degrees to the right from 0, we can just rotate the turret 90 degrees to the left to offset it. 
+
+To generalize to any yaw, we can subtract off the current turret rotation, which gives us the extra amount of rotation needed from the current position.
+
+Of course, shooting fuel into the hub requires more than just aiming in the right direction. There are two other factors we have control over; the pitch of the fuel (what angle the hood is at) and the launch speed (how fast we run the shooter motor). To make calculations easier, we'll use a fixed value for pitch (ex. 60 degrees) and solve only for launch speed.
+
+#### Projectile Motion Mini-Lesson
+
+<sub><sup>Mentors, explain projectile motion pls </sup></sub>
+
+#### Determining Launch Speed
+
+In order to simplify our calculations, we will assume the effects of air resistance on the fuel are negligible.
+
+To solve for launch speed, we'll be looking to relate what we know (vertical and horizontal distances from the launcher to the target) with what we're trying to find (launch speed). The easiest way we can do this is by writing an equation for this relationship, so let's go through how we'll set up the calculations!
+
+It will be much easier to solve for launch speed if we break it up into its horizontal and vertical components, v<sub>x</sub> and v<sub>y</sub>. Think of these components as the legs of a right triangle, with the combined velocity as the hypotenuse; using $\theta\ as our initial launch angle, we can write v<sub>x</sub> and v<sub>y</sub> as:
+$$
+v_x = v\cos\theta \\
+v_y = v\sin\theta
+$$
+
+Now that we've separated v into components, we can write separate motion equations for the horizontal and vertical movement of the fuel as it is launched towards the hub. For these equations, let x and y represent the horizontal and vertical displacement of the fuel in its path.
+
+Since we're ignoring air resistance, we can assume the fuel's horizontal velocity will remain constant. 
+
+We want to write an equation relating the fuel's horizontal velocity to something we know, like the distance it travels. Remember that:
+$$
+velocity = \frac{distance}{time}
+$$
+
+In our case, we can rewrite this definition as
+$$
+v_x = \frac{x}{t}
+$$
+Where t represents the time the fuel has been in the air.
+
+Our equation for vertical motion will be more complicated, due to gravity exerting a constant acceleration downwards on the fuel. This means our vertical velocity component, v<sub>y</sub>, will be decreasing as the fuel travels through the air.
+
+We'll start with a well-known kinematics equation, something you might see in Honors or AP Physics. These equations are meant to model the motion of an object in terms of variables like its initial position, velocity, and acceleration. The equation we'll use looks like this:
+$$
+displacement = v_0t + \frac{1}{2}at^2
+$$
+In this equation:
+displacement is how far the object has traveled from its starting point
+v<sub>0</sub> is the *initial velocity* (launch speed) of the object
+a is a constant *acceleration* being applied to the object
+t is the time elapsed since our object's release
+We want to rewrite this equation to fit our specific scenario. Our displacement will be the fuel's vertical displacement (y), our initial velocity will be the launch speed's vertical component (v<sub>y</sub>), and our acceleration will be the acceleration applied by gravity (g).
+
+Rewriting the equation:
+$$
+y = v_yt + \frac{1}{2}gt^2
+$$
+
+Now we have two equations, each modeling the fuel's horizontal and vertical motion:
+$$
+v_x = \frac{x}{t}
+y = v_yt + \frac{1}{2}gt^2
+$$
+
+You'll notice that, in both these equations, we have *two* unknown variables. This means we can't solve for launch speed using only one; we'll have to solve them as a system of equations.
+
+If you're confident with solving systems, we highly recommend doing the calculations yourself! If you'd like to see a sample solution, it's written below:  
+
+<details><summary> Sample Solution </summary>. 
+
+In order to make an equation with only one unknown variable, we'll solve one of the two equations for t. Then, we can substitute that expression for t into the other equation and simplify.
+
+Let's solve the horizontal motion equation for t:
+$$
+v_x = \frac{x}{t} \\
+(\text{multiply both sides by t})\implies tv_x = x \\
+(\text{divide both sides by }v_x)\implies t = \frac{x}{v_x}
+$$
+
+Now we can substitute this expression for t into our vertical motion equation:
+$$
+(\text{original equation})\implies y = v_yt + \frac{1}{2}gt^2 \\
+(\text{substitute in }t = \frac{x}{v_x})\implies y = v_y(\frac{x}{v_x}) + \frac{1}{2}g(\frac{x}{v_x})^2
+$$
+
+You'll notice that we still have two unknown variables, v<sub>x</sub> and v<sub>y</sub>. Luckily, both can be written in terms of v instead:
+
+$$
+v_x = v\cos\theta \\
+v_y = v\sin\theta
+$$
+
+Substituting these into our vertical motion equation:
+$$
+y = v_y(\frac{x}{v_x}) + \frac{1}{2}g(\frac{x}{v_x})^2 \\
+(\text{substitute in }v_x \text{ and }v_y)\implies y = (v\sin\theta)(\frac{x}{v\cos\theta}) + \frac{1}{2}g(\frac{x}{v\cos\theta})^2
+$$
+
+All we have to do now is simplify and solve for v!
+$$
+y = (v\sin\theta)(\frac{x}{v\cos\theta}) + \frac{1}{2}g(\frac{x}{v\cos\theta})^2 \\
+(\text{distribute})\implies y = \frac{x v\sin\theta}{v\cos\theta} + \frac{1}{2}g(\frac{x^2}{v^2\cos^2\theta}) \\
+(\text{distribute again})\implies y = \frac{x v\sin\theta}{v\cos\theta} + \frac{g x^2}{2v^2\cos^2\theta} \\
+(\text{cancel } v)\implies y = \frac{x \sin\theta}{\cos\theta} + \frac{g x^2}{2v^2\cos^2\theta} \\
+(\text{apply tan}\theta \text{ identity})\implies y = x\tan\theta + \frac{g x^2}{2v^2\cos^2\theta} \\
+(\text{isolate v on one side})\implies \frac{g x^2}{2v^2\cos^2\theta} = x\tan\theta - y \\
+(\text{solve for v})\implies gx^2 = 2v^2\cos^2\theta(x\tan\theta - y) \\
+\frac{gx^2}{x\tan\theta - y} = 2v^2\cos^2\theta \\
+\frac{1}{2\cos^2\theta}(\frac{gx^2}{x\tan\theta - y}) = v^2 \\
+\sqrt{\frac{gx^2}{(2\cos^2\theta)x\tan\theta - y}} = v \\
+\frac{x}{\cos\theta}\sqrt{\frac{g}{2(x\tan\theta - y)}} = v \\
+$$ 
+\
+**Solution**:
+$$
+v = \frac{x}{\cos\theta}\sqrt{\frac{g}{2(x\tan\theta - y)}}
+$$
+</details>. 
+
+
+Now that you've seen the calculations for both turret position and launch speed based on hub position, try creating methods to implement them!
+
+Here are some guidelines:
+- The initial pitch of the fuel (the hood angle) should stay at a constant value no matter where you're shooting from
+- Your methods should use both robot and hub positions to calculate yaw/launch speed
+- Detailed field dimensions (like hub position\height) can be found [here](https://firstfrc.blob.core.windows.net/frc2026/FieldAssets/2026-field-dimension-dwgs.pdf)
+
+#### Putting it Together
+
+Next, we'll implement these methods in `Robot.java` to make the robot automatically aim and shoot when in teleoperated mode.
+
+Similar to our bindings, we'll want to implement automatic targeting as a command that can be scheduled (in this case repeatedly, all the time). To put together our different aiming methods in the turret and shooter, we'll make another method in `Robot.java` to combine them and return a single command.
+
+Create a method in `Robot.java` that returns a `Command`. 
+
+We already know how to write a lambda expression that returns a command to call a single method. But what if we want to call multiple at the same time?
+
+`Commands.parallel()` is a method that takes in multiple commands and returns a new command to run all of them at the same time. Since we want the turret yaw and launch speed to adjust as soon as possible, this is ideal for automatic targeting; we can call both methods repeatedly, without having one wait for the other.
+
+We also want to use the `CommandsUtil.asDefault()` method on the commands we pass into `Commands.parallel()`. `asDefault()` makes it so the command passed in won't be run if its subsystems (requirements) are busy with something else. This allows us to implement things that might interrupt the aiming routine, like fixed shooting (launcher doesn't adjust based on robot position). 
+
+Using both these methods, complete your method to return automatic targeting as one command.
+
+Now that we can get this command more conveniently, let's add it to the robot. We won't be adding this to `initBindings()` (it wouldn't be convenient for the driver to be constantly spamming one button). Instead, it will go into the `robotPeriodic()` method where you added the line to run scheduled commands `CommandScheduler.getInstance().run()`.
+
+We want to schedule our automatic aiming command so that it is run every time `robotPeriodic()` is called. Do this using the line `CommandScheduler.getInstance().schedule()` to schedule your targeting command before running all scheduled commands. 
 
 ## Temporary End
 The rest of training is being actively written.
