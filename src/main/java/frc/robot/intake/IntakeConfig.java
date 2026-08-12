@@ -33,8 +33,8 @@ public class IntakeConfig {
         deployMotorConfig.SoftwareLimitSwitch.ForwardSoftLimitThreshold =
                 IntakeConst.MAX_ANGLE.in(Degrees);
 
-        deployMotorConfig.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
-        deployMotorConfig.SoftwareLimitSwitch.ReverseSoftLimitThreshold =
+        rollerMotorConfig.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
+        rollerMotorConfig.SoftwareLimitSwitch.ReverseSoftLimitThreshold =
                 IntakeConst.MIN_ANGLE.in(Degrees);
     }
 }
