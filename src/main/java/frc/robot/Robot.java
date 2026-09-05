@@ -6,13 +6,15 @@ package frc.robot;
 
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
-
 import frc.robot.intake.IntakeSubsystem;
 import frc.robot.launcher.feeder.FeederSubsystem;
 import frc.robot.launcher.hood.HoodSubsystem;
 import frc.robot.launcher.shooter.ShooterSubsystem;
+import frc.robot.launcher.turret.TurretSubsystem;
 import frc.robot.spindexer.SpindexerSubsystem;
 
 public class Robot extends TimedRobot {
@@ -22,6 +24,7 @@ public class Robot extends TimedRobot {
     private final FeederSubsystem feeder = new FeederSubsystem();
     private final HoodSubsystem hood = new HoodSubsystem();
     private final ShooterSubsystem shooter = new ShooterSubsystem();
+    private final TurretSubsystem turret = new TurretSubsystem();
 
     public Robot() {
         initDashboard();
@@ -34,12 +37,24 @@ public class Robot extends TimedRobot {
         SmartDashboard.putData("Feeder", feeder);
         SmartDashboard.putData("Hood", hood);
         SmartDashboard.putData("Shooter", shooter);
+        SmartDashboard.putData("Turret", turret);
     }
 
     public void initBindings() {
         controller.leftBumper().whileTrue(spindexer.runOnce(spindexer::start));
         controller.povDown().onTrue(intake.runOnce(intake::deploy));
         controller.povUp().onTrue(intake.runOnce(intake::stow));
+    }
+
+    public Command automaticTargeting() {
+        return Commands.defer(
+                    return Commands.parallel(
+                            CommandsUtil.asDefault(
+                                    Commands.runOnce(
+                                            () -> hood.calculateYaw())),
+                            CommandsUtil.asDefault(
+                                    hood.runOnce(
+                                            () -> turret.calculateLaunchSpeed())));
     }
 
     @Override
