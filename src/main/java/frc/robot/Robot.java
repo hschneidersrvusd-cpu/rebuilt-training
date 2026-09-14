@@ -4,12 +4,17 @@
 
 package frc.robot;
 
+import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
+import com.ctre.phoenix6.swerve.SwerveRequest;
+
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+
+import frc.robot.drivetrain.CommandSwerveDrivetrain;
+import frc.robot.drivetrain.DriveConfig;
+import frc.robot.drivetrain.TunerConstants;
 import frc.robot.intake.IntakeSubsystem;
 import frc.robot.launcher.feeder.FeederSubsystem;
 import frc.robot.launcher.hood.HoodSubsystem;
@@ -25,10 +30,32 @@ public class Robot extends TimedRobot {
     private final HoodSubsystem hood = new HoodSubsystem();
     private final ShooterSubsystem shooter = new ShooterSubsystem();
     private final TurretSubsystem turret = new TurretSubsystem();
+    private final CommandSwerveDrivetrain drivetrain =
+            new CommandSwerveDrivetrain(
+                    TunerConstants.DrivetrainConstants,
+                    TunerConstants.FrontLeft,
+                    TunerConstants.FrontRight,
+                    TunerConstants.BackLeft,
+                    TunerConstants.BackRight);
 
     public Robot() {
         initDashboard();
         initBindings();
+    }
+
+    public SwerveRequest getSwerveRequest(double xThrottle, double yThrottle, double rotThrottle) {
+        if (!DriveConfig.enabled) {
+            return new SwerveRequest.Idle();
+        } else {
+            SwerveRequest.FieldCentric swerveRequest = new SwerveRequest.FieldCentric();
+            return swerveRequest
+                    .withDeadband(DriveConfig.LINEAR_SPEED_DEADBAND)
+                    .withRotationalDeadband(DriveConfig.ANGULAR_SPEED_DEADBAND)
+                    .withDriveRequestType(DriveRequestType.Velocity)
+                    .withVelocityX(DriveConfig.MAX_SPEED.times(xThrottle))
+                    .withVelocityY(DriveConfig.MAX_SPEED.times(yThrottle))
+                    .withRotationalRate(DriveConfig.MAX_ROTATION_SPEED.times(rotThrottle));
+        }
     }
 
     public void initDashboard() {
@@ -44,18 +71,25 @@ public class Robot extends TimedRobot {
         controller.leftBumper().whileTrue(spindexer.runOnce(spindexer::start));
         controller.povDown().onTrue(intake.runOnce(intake::deploy));
         controller.povUp().onTrue(intake.runOnce(intake::stow));
+        drivetrain.setDefaultCommand(
+                drivetrain.applyRequest(
+                        () ->
+                                getSwerveRequest(
+                                        -controller.getLeftY(),
+                                        -controller.getLeftX(),
+                                        -controller.getRightX())));
     }
 
-    public Command automaticTargeting() {
-        return Commands.defer(
-                    return Commands.parallel(
-                            CommandsUtil.asDefault(
-                                    Commands.runOnce(
-                                            () -> hood.calculateYaw())),
-                            CommandsUtil.asDefault(
-                                    hood.runOnce(
-                                            () -> turret.calculateLaunchSpeed())));
-    }
+    // public Command automaticTargeting() {
+    //     return Commands.defer(
+    //                 return Commands.parallel(
+    //                         CommandsUtil.asDefault(
+    //                                 Commands.runOnce(
+    //                                         () -> hood.calculateYaw())),
+    //                         CommandsUtil.asDefault(
+    //                                 hood.runOnce(
+    //                                         () -> turret.calculateLaunchSpeed())));
+    // }
 
     @Override
     public void robotInit() {}
